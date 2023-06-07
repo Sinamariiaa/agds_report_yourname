@@ -1,0 +1,146 @@
+---
+title: "Report_Exercise_4.4"
+output: html_document
+date: "2023-05-12"
+---
+This exercise is concerned with data visualization. I am supposed to have hypotheses and create visualization that can help me determine, whether or not these hypothesis are correct. 
+
+First of all, I will create an object including the dataset, as it is going to be easier for me to work with it in this exercise: 
+
+```{r}
+
+data <- datasets::airquality
+
+View(datasets::airquality)
+
+library(ggplot2)
+
+```
+
+The first hypothesis I had, concerned the relationship between Temperature and the Ozone levels. I hypothesized, that the warmer it gets, the higher the Ozonelevels get. I also added Solar radiation to this idea, as another interesting predictor of the Ozone levels. 
+
+Here you can see the figure as well as the regression models and their summaries. My hypothesis can be accepted, the warmer it gets, the higher the Ozone levels get. The same goes for the value of solar radiation, even tho this idea has a lower R.Squared value.
+
+```{r}
+
+#Plot number one includes two plots, one comparing Temperature and Ozone and one comparing Solar radiation and Ozone. 
+
+plot1.1 <- ggplot(
+  data = data, 
+  aes(x = Temp, y = Ozone)) +
+  geom_jitter(size = 0.5, color = "blue") +
+  geom_smooth(method = lm, size = 2, color = "pink") +
+  theme_classic() +
+  labs(title = "Temperature/ Ozone",
+       y = "Ozone", 
+       x = "Temperature", 
+       )
+
+
+plot1.2 <- ggplot(
+  data = data, 
+  aes(x = Solar.R, y = Ozone)) +
+  geom_jitter(size = 0.5, color = "purple") +
+  geom_smooth(method = lm, size = 2, color = "pink") +
+  theme_classic() +
+  labs(title = "Solar rad./ Ozone",
+       y = "Ozone", 
+       x = "Solar radiation", 
+       )
+
+
+plot1 <- cowplot::plot_grid(plot1.1, plot1.2)
+plot(plot1)
+
+
+lm1.1 <- lm(Ozone ~ Temp, data = data)
+summary(lm1.1)
+
+#R-Sqaured value: 0.487, significant
+
+lm1.2 <- lm(Ozone ~ Solar.R, data = data)
+summary(lm1.2)
+
+#R-Sqaured value: 0.1213, significant
+
+```
+The second plot looks at the relationship between Wind and Temperature. My hypothesis here was, that Wind has a negative effect on temperature. 
+
+This hypothesis can be accepted considering the plot. The R-Squared value is not as high (0.2)
+
+```{r}
+
+# Plot number 2 is a plot that looks at the relationship between Wind and Temperature.
+
+plot2 <- ggplot(
+  data = data,
+  aes(x = Wind, y = Temp)) +
+  geom_point(size = 2, color = "purple") +
+  geom_smooth(method = lm, size = 2, color = "pink") +
+  theme_minimal()+
+  labs(title = "linear regression model",
+       y = "Temperature", 
+       x = "Wind", 
+       )
+
+plot(plot2)
+
+#linear model to get the R-Squared value 
+
+lm2 <- lm(Temp ~ Wind, data = data)
+summary(lm2)
+
+#R-Squared value is around 0.2 (not very high) and the wind has a negative effect on the Temperature (as expected)
+
+```
+
+Hypothesis number three is concerned with the Ozone levels in each month. The hypothesis is, that the levels get higher in the summer months (because the temperature is usually higher in these months). I made two plots, the plot number four was just an orientation for me to see which months were the warmer months. 
+
+I was able to show, using the plot, that the Ozon levels are higher in the months 7 and 8 (presumably july and august).
+
+I then identified the outliers as well. With the outliers it was interesting to see, that very high values in the Ozone department also meant very high levels in the Solar Radiation department.
+
+
+```{r}
+
+
+#plot number three is a plot that looks at the ozone value in each month. 
+
+plot3 <- ggplot(
+  data = data, 
+  aes(x = Ozone)) +
+  geom_density(size = 0.5, color = "turquoise") +
+  theme_bw() + 
+  labs(title = "Ozone per month",
+       x = "Ozone") + 
+  facet_wrap(~Month)
+
+plot(plot3)
+
+
+#outlier identification
+
+lower_normal <- quantile(data$Ozone, 0.025, na.rm = T)
+upper_normal <- quantile(data$Ozone, 0.975, na.rm = T)
+
+outlier <- which(data$Ozone < lower_normal | data$Ozone > upper_normal)
+data[outlier,]
+
+View(outlier)
+
+#plot number four was just for me to see which months are the warm months (as i was confused with the numbers).
+
+plot4 <- ggplot(
+  data = data, 
+  aes(x = Temp)) +
+  geom_density(size = 0.5, color = "turquoise") +
+  theme_bw() + 
+  labs(title = "Temp per month",
+       x = "Temp") + 
+  facet_wrap(~Month)
+
+
+plot(plot4)
+
+```
+
