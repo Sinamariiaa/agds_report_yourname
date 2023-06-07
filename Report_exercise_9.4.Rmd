@@ -1,0 +1,131 @@
+---
+title: "Exercise_9.4"
+output: html_document
+date: "2023-06-07"
+---
+
+Comparison of the linear regression and knn model:
+
+```{r}
+
+daily_fluxes <- readr::read_csv("/Users/sina/Downloads/FLX_CH-Dav_FLUXNET2015_FULLSET_DD_1997-2014_1-3-2.csv")
+
+#all the used packages
+
+library(ggplot2)
+library(tidyverse)
+library(tidyr)
+library(recipes)
+library(caret)
+library(devRate)
+
+# Data cleaning: looks ok, no obviously bad data
+# no long tail, therefore no further target engineering
+
+daily_fluxes |> 
+  ggplot(aes(x = GPP_NT_VUT_REF, y = ..count..)) + 
+  geom_histogram()
+
+# Data splitting
+set.seed(1982)  # for reproducibility
+split <- rsample::initial_split(daily_fluxes, prop = 0.7, strata = "VPD_F")
+daily_fluxes_train <- rsample::training(split)
+daily_fluxes_test <- rsample::testing(split)
+
+# Model and pre-processing formulation, use all variables but LW_IN_F
+pp <- recipes::recipe(GPP_NT_VUT_REF ~ SW_IN_F + VPD_F + TA_F, 
+                      data = daily_fluxes_train |> drop_na()) |> 
+  recipes::step_BoxCox(all_predictors()) |> 
+  recipes::step_center(all_numeric(), -all_outcomes()) |>
+  recipes::step_scale(all_numeric(), -all_outcomes())
+
+# Fit linear regression model
+mod_lm <- caret::train(
+  pp, 
+  data = daily_fluxes_train |> drop_na(), 
+  method = "lm",
+  trControl = caret::trainControl(method = "none"),
+  metric = "RMSE"
+)
+
+# Fit KNN model
+mod_knn <- caret::train(
+  pp, 
+  data = daily_fluxes_train |> drop_na(), 
+  method = "knn",
+  trControl = caret::trainControl(method = "none"),
+  tuneGrid = data.frame(k = 35),
+  metric = "RMSE"
+)
+# make model evaluation into a function to reuse code
+
+source("vignettes:re_ml01.R")
+
+# linear regression model
+eval_model(mod = mod_lm, df_train = daily_fluxes_train, df_test = daily_fluxes_test)
+
+
+# KNN
+eval_model(mod = mod_knn, df_train = daily_fluxes_train, df_test = daily_fluxes_test)
+
+view(daily_fluxes)
+
+library(lubridate)
+
+daily_fluxes$TIMESTAMP <- ymd(daily_fluxes$TIMESTAMP)
+
+
+
+```
+
+
+Answer one:
+
+The difference is bigger in the knn approach, because this method is not linear and thus more directly related to the concrete values in the different sets (training vs. test) this means, that the differences get bigger because the model is fitted more closely to the concrete values than in a linear regression model. 
+
+answer two:
+
+The knn model is, as stated previously, oriented more closely towards the concrete values of the sample data, It is less of a generalization than the linear regression model. 
+
+answer three:
+
+The linear regression model is more prone to underfitting, because it is less affected by the noise values that a knn model is prone towards. The knn model can be prone to both, but, in comparison to the linear regression model, is more prone towards overfitting (especially with a small k). Underfitting describes the obstacle, where a model has high bias but low variance (the extreme would be a model that only evaluated the means or medians), the opposite would be overfitting, where a model wants "too much" and is too close to the training data, so low bias but is not very generalizable (low variance).
+
+
+The Variance bias dilemma explains an essential problem in Data Science and Machine learning. The main issue is, the the two thingies, variance and bias are impertinently  connected to each other. As one gets bigger the other gets smaller and vice versa. The issue is, that we actually would want a low bias and a low variance, thus we have ourselves a bit of a dilemma. The variance explains the difference that each model would have if we had different training sets (variance is low in very simple models as they are focused on simple things) and the bias describes how far from the truth the prediction is. 
+
+Overfit models are models that are very true to the training set but they would be vastly different with another subset of the data. Underfoot models are ones with more bias but less variance. These are furthest from the truth in the training data but would be closely the same in different subsets of the data.
+
+The role of k:
+
+1. 
+
+A model that has a very low k sample would be overfit, seems counter intuitive but it is due to the fact that it would pick up on every minor “noise” in the data subset. For example it could be that the one nearest neighbour to our variable. Is an outcast and now we would thing this is the most accurate predictor and use it. So now we have low bias because we are closes to the “truth” but we have high variance because in a different subset we might not have the same outcast and the result would be very different. 
+
+The other way round, we fall victim to undercutting. This means, that we have more bias, stray further from the truth but have low variance as the results will be really similar to each other in different subsets. Especially if k = n we almost always get the same result, as the neighbours that are overrepresented will be chosen each time.
+
+2. Now i put these assumptions to test:
+
+```{r}
+set.seed(1982)
+mod_cv <- caret::train(pp, 
+                       data = daily_fluxes_train |> drop_na(), 
+                       method = "knn",
+                       trControl = caret::trainControl(method = "cv", number = 10),
+                       tuneGrid = data.frame(k = c(2, 5, 10, 15, 20, 25, 30, 35, 40, 60, 100)),
+                       metric = "MAE")
+
+print(mod_cv)
+
+#35 is the perfect k for knn
+```
+
+
+
+
+
+
+
+
+
+

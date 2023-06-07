@@ -1,0 +1,98 @@
+---
+title: "Untitled"
+output: html_document
+date: "2023-06-07"
+---
+
+Dimension of a circle:
+
+This code calculates the area, as well as the circumference of a circle. It then prints this information as text. 
+
+```{r}
+
+ra <- 2
+
+area_circle <- pi*ra^2
+
+circumferenc_circle <- 2*pi*ra
+
+print(paste("circumferenc_circle:", circumferenc_circle, "area_circle:", area_circle)
+
+      
+      
+```
+
+Sequence of numbers:
+
+This code creates a sequence of numbers from o to pi in five steps. 
+
+```{r}
+seq(0, pi, length.out = 5)
+```
+Gauss sum:
+
+This code helps you calculate the sum of the numbers from 1 to 100.
+
+```{r}
+sum(1:100)
+
+vector_a <- 1:50
+vector_b <- 100:51
+vector_c <- vector_a + vector_b
+
+vector_c
+
+sum(vector_c)
+
+```
+Magic trick algorithm:
+
+This code is just a little magic trick :)
+
+```{r}
+x <- 3 
+x_s <- x  
+x <- x + 1
+x <- x * 2
+x <- x + 4
+x <- x / 2
+x - x_s
+```
+vectors:
+
+Here the code determines the class an dlength of the object as well as the most important measures
+
+```{r}
+class(datasets::rivers)
+
+length(datasets::rivers)
+
+mean(datasets::rivers)
+
+quantile(datasets::rivers, probs = 0.33)
+```
+
+
+
+data frames:
+
+This code gives you information about the dimesnion of the data frame quakes. Then it also gives you information about the Richter magnitude as well as largest magnitude, as well as the coordinates for said largest event
+
+```{r}
+datasets::quakes
+
+dim(datasets::quakes)
+
+vector1<- datasets::quakes$mag
+max(vector1)
+
+idx <- which.max(vector1)  
+datasets::quakes$long[idx]
+
+datasets::quakes$lat[idx]
+
+```
+
+
+
+

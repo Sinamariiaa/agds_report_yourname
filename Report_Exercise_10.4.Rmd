@@ -1,0 +1,362 @@
+---
+title: "Report_Exercises_10.4"
+output: html_document
+date: "2023-06-07"
+---
+
+Here I readin the main data points:
+
+```{r}
+daily_flux_davos <-readr::read_csv("/Users/sina/Downloads/FLX_CH-Dav_FLUXNET2015_FULLSET_DD_1997-2014_1-3-2.csv")
+
+daily_flux_validierung_laegern <- readr::read_csv("/Users/sina/Downloads/FLX_CH-Lae_FLUXNET2015_FULLSET_DD_2004-2014_1-4.csv")
+
+
+library(ggplot2)
+library(tidyverse)
+library(tidyr)
+library(recipes)
+
+library(caret)
+
+library(devRate)
+
+```
+
+In this first part I use the data of davos to train a knn model and then I use the data of laegern to test said model:
+
+```{r}
+
+```{r}
+
+daily_flux_davos <-readr::read_csv("/Users/sina/Downloads/FLX_CH-Dav_FLUXNET2015_FULLSET_DD_1997-2014_1-3-2.csv")
+
+daily_flux_validierung_laegern <- readr::read_csv("/Users/sina/Downloads/FLX_CH-Lae_FLUXNET2015_FULLSET_DD_2004-2014_1-4.csv")
+
+
+library(ggplot2)
+library(tidyverse)
+library(tidyr)
+library(recipes)
+
+library(caret)
+
+library(devRate)
+
+# Data splitting
+set.seed(1982)  # for reproducibility
+split_davos <- rsample::initial_split(daily_flux_davos, prop = 0.8, strata = "VPD_F")
+daily_fluxes_davos_train <- rsample::training(split_davos)
+daily_fluxes_davos_test <- rsample::testing(split_davos)
+
+# Model and pre-processing formulation, use all variables but LW_IN_F
+pp_davos <- recipes::recipe(GPP_NT_VUT_REF ~ SW_IN_F + VPD_F + TA_F, 
+                      data = daily_fluxes_davos_train |> drop_na()) |> 
+  recipes::step_BoxCox(all_predictors()) |> 
+  recipes::step_center(all_numeric(), -all_outcomes()) |>
+  recipes::step_scale(all_numeric(), -all_outcomes())
+
+# Fit KNN model
+mod_knn_davos <- caret::train(
+  pp_davos, 
+  data = daily_fluxes_davos_train |> drop_na(), 
+  method = "knn",
+  trControl = caret::trainControl(method = "none"),
+  tuneGrid = data.frame(k = 35),
+  metric = "RMSE"
+)
+
+
+
+# make model evaluation into a function to reuse code
+eval_model_davos <- function(mod_knn_davos, df_train_davos, df_test_davos){
+  
+  # add predictions to the data frames
+  df_train_davos <- df_train_davos |> 
+    drop_na()
+  df_train_davos$fitted <- predict(mod_knn_davos, newdata = df_train_davos)
+  
+  df_test_davos <- df_test_davos |> 
+    drop_na()
+  df_test_davos$fitted <- predict(mod_knn_davos, newdata = df_test_davos)
+  
+  # get metrics tables
+  metrics_train_davos <- df_train_davos |> 
+    yardstick::metrics(GPP_NT_VUT_REF, fitted)
+  
+  metrics_test_davos <- df_test_davos |> 
+    yardstick::metrics(GPP_NT_VUT_REF, fitted)
+  
+  # extract values from metrics tables
+  rmse_train_davos <- metrics_train_davos |> 
+    filter(.metric == "rmse") |> 
+    pull(.estimate)
+  rsq_train_davos <- metrics_train_davos |> 
+    filter(.metric == "rsq") |> 
+    pull(.estimate)
+  
+  rmse_test_davos <- metrics_test_davos |> 
+    filter(.metric == "rmse") |> 
+    pull(.estimate)
+  rsq_test_davos <- metrics_test_davos |> 
+    filter(.metric == "rsq") |> 
+    pull(.estimate)
+  
+  # visualise as a scatterplot
+  # adding information of metrics as sub-titles
+  plot_1_davos <- ggplot(data = df_train_davos, aes(GPP_NT_VUT_REF, fitted)) +
+    geom_point(alpha = 0.2) +
+    geom_smooth(method = "lm", se = FALSE, color = "red") +
+    geom_abline(slope = 1, intercept = 0, linetype = "dotted") +
+    labs(subtitle = bquote( italic(R)^2 == .(format(rsq_train_davos, digits = 2)) ~~
+                            RMSE == .(format(rmse_train_davos, digits = 3))),
+         title = "Training set") +
+    theme_classic()
+  
+  plot_2_davos <- ggplot(data = df_test_davos, aes(GPP_NT_VUT_REF, fitted)) +
+    geom_point(alpha = 0.2) +
+    geom_smooth(method = "lm", se = FALSE, color = "red") +
+    geom_abline(slope = 1, intercept = 0, linetype = "dotted") +
+    labs(subtitle = bquote( italic(R)^2 == .(format(rsq_test_davos, digits = 2)) ~~
+                            RMSE == .(format(rmse_test_davos, digits = 3))),
+         title = "Test set") +
+    theme_classic()
+  
+  out <- cowplot::plot_grid(plot_1_davos, plot_2_davos)
+  
+  return(out)
+}
+
+# KNN
+eval_model_davos(mod = mod_knn_davos, df_train_davos = daily_fluxes_davos_train, df_test_davos = daily_fluxes_davos_test)
+
+
+set.seed(1982)
+#mod_cv <- caret::train(pp_davos, 
+                      # data = daily_fluxes_davos_train |> drop_na(), 
+                       #method = "knn",
+                       #trControl = caret::trainControl(method = "cv", number = 10),
+                       #tuneGrid = data.frame(k = c(2, 5, 10, 15, 20, 25, 30, 35, 40, 60, 100)),
+                       #metric = "MAE")
+
+
+#print(mod_cv)
+
+#35 is the perfect k for knn
+
+#Now i test this with the different site 
+eval_model_davos_validierung_laegern <- function(mod_knn_davos, df_train_davos, df_test_davos_validierung_laegern){
+  
+  df_train_davos <- df_train_davos |> 
+    drop_na()
+  df_train_davos$fitted <- predict(mod_knn_davos, newdata = df_train_davos)
+  
+  df_test_davos_validierung_laegern <- daily_flux_validierung_laegern |> 
+    drop_na()
+  df_test_davos_validierung_laegern$fitted <- predict(mod_knn_davos, newdata = df_test_davos_validierung_laegern)
+  
+  # get metrics tables
+  
+  metrics_train_davos <- df_train_davos |> 
+    yardstick::metrics(GPP_NT_VUT_REF, fitted)
+  
+  metrics_test_davos_validierung_laegern <- df_test_davos_validierung_laegern |> 
+    yardstick::metrics(GPP_NT_VUT_REF, fitted)
+  
+  # extract values from metrics tables
+  
+  rmse_train_davos <- metrics_train_davos |> 
+    filter(.metric == "rmse") |> 
+    pull(.estimate)
+  rsq_train_davos <- metrics_train_davos |> 
+    filter(.metric == "rsq") |> 
+    pull(.estimate)
+  
+  rmse_test_davos_validierung_laegern <- metrics_test_davos_validierung_laegern |> 
+    filter(.metric == "rmse") |> 
+    pull(.estimate)
+  rsq_test_davos_validierung_laegern <- metrics_test_davos_validierung_laegern |> 
+    filter(.metric == "rsq") |> 
+    pull(.estimate)
+  
+  # visualise as a scatterplot
+  # adding information of metrics as sub-titles
+  plot_1_davos <- ggplot(data = df_train_davos, aes(GPP_NT_VUT_REF, fitted)) +
+    geom_point(alpha = 0.2) +
+    geom_smooth(method = "lm", se = FALSE, color = "red") +
+    geom_abline(slope = 1, intercept = 0, linetype = "dotted") +
+    labs(subtitle = bquote( italic(R)^2 == .(format(rsq_train_davos, digits = 2)) ~~
+                            RMSE == .(format(rmse_train_davos, digits = 3))),
+         title = "Training set") +
+    theme_classic()
+  
+  
+  plot_2_davos_validierung_laegern <- ggplot(data = df_test_davos_validierung_laegern, aes(GPP_NT_VUT_REF, fitted)) +
+    geom_point(alpha = 0.2) +
+    geom_smooth(method = "lm", se = FALSE, color = "red") +
+    geom_abline(slope = 1, intercept = 0, linetype = "dotted") +
+    labs(subtitle = bquote( italic(R)^2 == .(format(rsq_test_davos_validierung_laegern, digits = 2)) ~~
+                            RMSE == .(format(rmse_test_davos_validierung_laegern, digits = 3))),
+         title = "Test set") +
+    theme_classic()
+  
+  out <- cowplot::plot_grid(plot_1_davos, plot_2_davos_validierung_laegern)
+  
+  return(out)
+}
+
+# KNN
+eval_model_davos_validierung_laegern(mod = mod_knn_davos, df_train_davos = daily_fluxes_davos_train, df_test_davos_validierung_laegern = daily_flux_validierung_laegern)
+
+
+set.seed(1982)
+#mod_cv <- caret::train(pp_davos, 
+                      # data = daily_fluxes_davos_train |> drop_na(), 
+                       #method = "knn",
+                       #trControl = caret::trainControl(method = "cv", number = 10),
+                       #tuneGrid = data.frame(k = c(2, 5, 10, 15, 20, 25, 30, 35, 40, 60, 100)),
+                       #metric = "MAE")
+
+#print(mod_cv)
+
+#35 is the best possible k
+
+
+```
+When comparing the model that is trained and tested using the same data and the model that is trained and tested using different data we can see extreme differences. In the ladder we see, that the RSME, th measure that tells us about the variance, is a lot higher than in the first one. this is obviously due to the fact that the testing happens with another data set. 
+
+
+
+Now in a second part I pool the data of laegern and davos and then split this pooled data in a train and a test set. 
+
+
+```{r}
+daily_flux_davos <-readr::read_csv("/Users/sina/Downloads/FLX_CH-Dav_FLUXNET2015_FULLSET_DD_1997-2014_1-3-2.csv")
+
+daily_flux_laegern <- readr::read_csv("/Users/sina/Downloads/FLX_CH-Lae_FLUXNET2015_FULLSET_DD_2004-2014_1-4.csv")
+
+
+gepoolte_daten <- dplyr::bind_rows(daily_flux_davos, daily_flux_laegern)
+
+#View(gepoolte_daten)
+
+library("dplyr")
+
+       gepoolte_daten <- gepoolte_daten %>%
+            filter( VPD_F  > 0)
+
+gepoolte_daten <- gepoolte_daten %>% filter(SW_IN_F > 0)
+
+gepoolte_daten <- gepoolte_daten %>% filter(TA_F > 0)
+
+gepoolte_daten <- gepoolte_daten %>%  filter(GPP_NT_VUT_REF >0)
+
+gepoolte_daten <- gepoolte_daten %>% select("SW_IN_F", "TA_F", "GPP_NT_VUT_REF", "VPD_F")
+```
+
+
+```{r}
+
+# Data splitting
+set.seed(1982)  # for reproducibility
+split_gepoolte_daten <- rsample::initial_split(gepoolte_daten, prop = 0.8, strata = "VPD_F")
+gepoolte_daten_training <- rsample::training(split_gepoolte_daten)
+gepoolte_daten_test <- rsample::testing(split_gepoolte_daten)
+
+# Model and pre-processing formulation, use all variables but LW_IN_F
+pp_gepoolte_daten <- recipes::recipe(GPP_NT_VUT_REF ~ SW_IN_F + VPD_F + TA_F, 
+                      data = gepoolte_daten |> drop_na()) |> 
+  recipes::step_BoxCox(all_predictors()) |> 
+  recipes::step_center(all_numeric(), -all_outcomes()) |>
+  recipes::step_scale(all_numeric(), -all_outcomes())
+
+
+
+# Fit KNN model
+mod_knn_gepoolte_daten <- caret::train(
+  pp_gepoolte_daten, 
+  data = gepoolte_daten_training |> drop_na(), 
+  method = "knn",
+  trControl = caret::trainControl(method = "none"),
+  tuneGrid = data.frame(k = 35),
+  metric = "RMSE"
+)
+# make model evaluation into a function to reuse code
+eval_model_gepoolte_daten <- function(mod_knn_gepoolte_daten, df_train_gepoolte_daten, df_test_gepoolte_daten){
+  
+  # add predictions to the data frames
+  df_train_gepoolte_daten <- df_train_gepoolte_daten |> 
+    drop_na()
+  df_train_gepoolte_daten$fitted <- predict(mod_knn_gepoolte_daten, newdata = df_train_gepoolte_daten)
+  
+  df_test_gepoolte_daten <- df_test_gepoolte_daten |> 
+    drop_na()
+  df_test_gepoolte_daten$fitted <- predict(mod_knn_gepoolte_daten, newdata = df_test_gepoolte_daten)
+  
+  # get metrics tables
+  metrics_train_gepoolte_daten <- df_train_gepoolte_daten |> 
+    yardstick::metrics(GPP_NT_VUT_REF, fitted)
+  
+  metrics_test_gepoolte_daten <- df_test_gepoolte_daten |> 
+    yardstick::metrics(GPP_NT_VUT_REF, fitted)
+  
+  # extract values from metrics tables
+  rmse_train_gepoolte_daten <- metrics_train_gepoolte_daten |> 
+    filter(.metric == "rmse") |> 
+    pull(.estimate)
+  rsq_train_gepoolte_daten <- metrics_train_gepoolte_daten |> 
+    filter(.metric == "rsq") |> 
+    pull(.estimate)
+  
+  rmse_test_gepoolte_daten <- metrics_test_gepoolte_daten |> 
+    filter(.metric == "rmse") |> 
+    pull(.estimate)
+  rsq_test_gepoolte_daten <- metrics_test_gepoolte_daten |> 
+    filter(.metric == "rsq") |> 
+    pull(.estimate)
+  
+  # visualise as a scatterplot
+  # adding information of metrics as sub-titles
+  plot_1_gepoolte_daten <- ggplot(data = df_train_gepoolte_daten, aes(GPP_NT_VUT_REF, fitted)) +
+    geom_point(alpha = 0.2) +
+    geom_smooth(method = "lm", se = FALSE, color = "red") +
+    geom_abline(slope = 1, intercept = 0, linetype = "dotted") +
+    labs(subtitle = bquote( italic(R)^2 == .(format(rsq_train_gepoolte_daten, digits = 2)) ~~
+                            RMSE == .(format(rmse_train_gepoolte_daten, digits = 3))),
+         title = "Training set") +
+    theme_classic()
+  
+  plot_2_gepoolte_daten <- ggplot(data = df_test_gepoolte_daten, aes(GPP_NT_VUT_REF, fitted)) +
+    geom_point(alpha = 0.2) +
+    geom_smooth(method = "lm", se = FALSE, color = "red") +
+    geom_abline(slope = 1, intercept = 0, linetype = "dotted") +
+    labs(subtitle = bquote( italic(R)^2 == .(format(rsq_test_gepoolte_daten, digits = 2)) ~~
+                            RMSE == .(format(rmse_test_gepoolte_daten, digits = 3))),
+         title = "Test set") +
+    theme_classic()
+  
+  out <- cowplot::plot_grid(plot_1_gepoolte_daten, plot_2_gepoolte_daten)
+  
+  return(out)
+}
+
+# KNN
+eval_model_gepoolte_daten(mod = mod_knn_gepoolte_daten, df_train_gepoolte_daten = gepoolte_daten_training, df_test_gepoolte_daten = gepoolte_daten_test)
+
+
+set.seed(1982)
+mod_cv <- caret::train(pp_gepoolte_daten, 
+                       data = gepoolte_daten_training |> drop_na(), 
+                       method = "knn",
+                       trControl = caret::trainControl(method = "cv", number = 10),
+                       tuneGrid = data.frame(k = c(2, 5, 10, 15, 20, 25, 30, 35, 40, 60, 100)),
+                       metric = "MAE")
+
+#print(mod_cv)
+
+```
+With this model, with the pooled data, it is interesting to see, that both measures are relatively stable. This makes sense as we are training and testing with the same data (both data sets pooled but the same data points twice).
+
+
+Over all, I would say, the out of site testing does not make a lot of sense. I think the pooled training and testing makes a lot of sense, as it takes both of the very different sites into account also in the model building phase. Laegern for example is a ountain in the Jura region that is located on 800 meters above sea, davos on the other hand is an alpine town located on 1500 meters above sea level. The differences in the test and training otcome thus make a lot of sense. To train a model with both data points makes sense too, like this it is more generalizable.
+

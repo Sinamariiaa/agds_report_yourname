@@ -1,0 +1,377 @@
+---
+title: "Report_exercise_8.5"
+output: html_document
+date: "2023-05-22"
+---
+
+Stepwise forward regression 
+
+ Daten einlesen
+```{r}
+
+data_stepwise_reg_ <-read.csv('/Users/sina/Downloads/df_for_stepwise_regression.csv')
+
+View(data_stepwise_reg_)
+
+library(dplyr)
+
+data_stepwise_reg_ <-  select(data_stepwise_reg_, -c(siteid, TIMESTAMP, PPFD_IN, LW_IN_F_MDS ))
+
+require(dplyr)
+
+data_stepwise_reg_ <- data_stepwise_reg_ %>% relocate(GPP_NT_VUT_REF, .before = TA_F)
+
+View(data_stepwise_reg_)
+
+#package to compare models based on AIC:
+
+install.packages("AICcmodavg")
+library(AICcmodavg)
+
+library(ggplot2)
+
+install.packages("moonBook")
+library(moonBook)
+
+
+```
+
+All bivariate models:
+
+```{r}
+#Here i did a loop to find out, which one variable has the highest R-Squared value
+
+mod_summaries <- list()
+
+for(i in 2:ncol(data_stepwise_reg_)) {           
+  predictors_i <- colnames(data_stepwise_reg_)[i]   
+  mod_summaries[[i - 1]] <- summary(     
+    lm(GPP_NT_VUT_REF ~ ., data_stepwise_reg_[ , c("GPP_NT_VUT_REF", predictors_i)]))
+ 
+}
+
+predictors_i
+
+mod_summaries <- mod_summaries
+
+plot_bivariate <- ggplot(
+  data = data_stepwise_reg_, 
+  aes(x = SW_IN_F, y= GPP_NT_VUT_REF)) +
+  geom_point(size = 0.1, color = "turquoise") +
+  geom_smooth(method = lm)+
+  theme_bw() + 
+  labs(title = "Bivariate model",
+       x = "SW_IN_F", 
+       y = "GPP") 
+
+plot(plot_bivariate)
+
+
+```
+
+
+```{r}
+
+
+  # Variable SW_IN_F has the highest R squared value so i continue with this one  0.4306. 
+
+data_stepwise_reg_ <- data_stepwise_reg_ %>% relocate(SW_IN_F, .before = TA_F)
+
+for(i in 3:ncol(data_stepwise_reg_)) {           
+  predictors_i <- colnames(data_stepwise_reg_)[i]   
+  mod_summaries[[i - 2]] <- summary(     
+    lm(GPP_NT_VUT_REF ~ SW_IN_F + ., data_stepwise_reg_[ , c("GPP_NT_VUT_REF", "SW_IN_F", predictors_i)]))
+ 
+}
+
+mod_summaries
+
+ #Model with the additional variable LW_IN_F  has the highest Rsquared value. SW_IN_F plus LW_IN_F 0.5355. Now I will compare their AIC
+
+model_SW_IN_F <- lm(GPP_NT_VUT_REF ~ SW_IN_F, data = data_stepwise_reg_)
+model_SW_IN_F_LW_IN_F <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F, data = data_stepwise_reg_)
+
+models <- list(model_SW_IN_F, model_SW_IN_F_LW_IN_F)
+model.names <- c("model_one", "model_two")
+
+aictab(cand.set = models, modnames = model.names)
+
+#The model with the two variables fits better so in continue on with the stepwise regression with LW_IN_F
+
+data_stepwise_reg_ <- data_stepwise_reg_ %>% relocate(LW_IN_F, .before = TA_F)
+
+for(i in 4:ncol(data_stepwise_reg_)) {           
+  predictors_i <- colnames(data_stepwise_reg_)[i]   
+  mod_summaries[[i - 3]] <- summary(     
+    lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + ., data_stepwise_reg_[ , c("GPP_NT_VUT_REF", "SW_IN_F", "LW_IN_F", predictors_i)]))
+ 
+}
+
+mod_summaries
+
+#The model with the variable VPD_F has the highest R squared value of 0.5731. So i will compare its AIC to the model with the two predictor variables
+
+model_SW_IN_F <- lm(GPP_NT_VUT_REF ~ SW_IN_F, data = data_stepwise_reg_)
+model_SW_IN_F_LW_IN_F <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F, data = data_stepwise_reg_)
+model_SW_IN_F_LW_IN_F_VPD_F <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F, data = data_stepwise_reg_)
+
+models <- list(model_SW_IN_F, model_SW_IN_F_LW_IN_F, model_SW_IN_F_LW_IN_F_VPD_F)
+model.names <- c("model_one", "model_two", "model_three")
+
+aictab(cand.set = models, modnames = model.names)
+
+#The model with the three variables fits better so I continue on, now including VPD_F.
+
+
+data_stepwise_reg_ <- data_stepwise_reg_ %>% relocate(VPD_F, .before = TA_F)
+
+for(i in 5:ncol(data_stepwise_reg_)) {           
+  predictors_i <- colnames(data_stepwise_reg_)[i]   
+  mod_summaries[[i - 1]] <- summary(     
+    lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F + ., data_stepwise_reg_[ , c("GPP_NT_VUT_REF", "SW_IN_F", "LW_IN_F", "VPD_F", predictors_i)]))
+ 
+}
+
+mod_summaries
+
+#The model including the variable TA_F has the highest R-Squared value. I use this one to calculate the AIC.
+
+
+model_SW_IN_F <- lm(GPP_NT_VUT_REF ~ SW_IN_F, data = data_stepwise_reg_)
+model_SW_IN_F_LW_IN_F <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F, data = data_stepwise_reg_)
+model_SW_IN_F_LW_IN_F_VPD_F <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F, data = data_stepwise_reg_)
+model_SW_IN_F_LW_IN_F_VPD_F_TA_F <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F + TA_F, data = data_stepwise_reg_)
+
+models <- list(model_SW_IN_F, model_SW_IN_F_LW_IN_F, model_SW_IN_F_LW_IN_F_VPD_F, model_SW_IN_F_LW_IN_F_VPD_F_TA_F)
+model.names <- c("model_one", "model_two", "model_three", "model_four")
+
+aictab(cand.set = models, modnames = model.names)
+
+#the model with the four variables still fits better so i continue with the five variables now including TA_F.
+
+View(data_stepwise_reg_)
+
+for(i in 6:ncol(data_stepwise_reg_)) {           
+  predictors_i <- colnames(data_stepwise_reg_)[i]   
+  mod_summaries[[i - 1]] <- summary(     
+    lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F + TA_F + ., data_stepwise_reg_[ , c("GPP_NT_VUT_REF", "SW_IN_F", "LW_IN_F", "VPD_F","TA_F", predictors_i)]))
+ 
+}
+
+mod_summaries
+
+# the model including th variable P_F has the highest R-Squared value of 0.593. Now i check the AIC
+
+model_SW_IN_F <- lm(GPP_NT_VUT_REF ~ SW_IN_F, data = data_stepwise_reg_)
+model_SW_IN_F_LW_IN_F <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F, data = data_stepwise_reg_)
+model_SW_IN_F_LW_IN_F_VPD_F <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F, data = data_stepwise_reg_)
+model_SW_IN_F_LW_IN_F_VPD_F_TA_F <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F + TA_F, data = data_stepwise_reg_)
+model_SW_IN_F_LW_IN_F_VPD_F_TA_F_P_F <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F + TA_F + P_F, data = data_stepwise_reg_)
+
+models <- list(model_SW_IN_F, model_SW_IN_F_LW_IN_F, model_SW_IN_F_LW_IN_F_VPD_F, model_SW_IN_F_LW_IN_F_VPD_F_TA_F, model_SW_IN_F_LW_IN_F_VPD_F_TA_F_P_F)
+model.names <- c("model_one", "model_two", "model_three", "model_four", "model_five")
+
+aictab(cand.set = models, modnames = model.names)
+
+#the model five still fits better so i continue with the variable P_F
+
+data_stepwise_reg_ <- data_stepwise_reg_ %>% relocate(P_F, .before = PA_F)
+
+for(i in 7:ncol(data_stepwise_reg_)) {           
+  predictors_i <- colnames(data_stepwise_reg_)[i]   
+  mod_summaries[[i - 1]] <- summary(     
+    lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F + TA_F + P_F+ ., data_stepwise_reg_[ , c("GPP_NT_VUT_REF", "SW_IN_F", "LW_IN_F", "VPD_F","TA_F", "P_F", predictors_i)]))
+ 
+}
+
+mod_summaries
+
+#the model including the variable WS_F has the highest R-Squared value of 0.5945. I will continue to calculate the AIC:
+
+model_1_p <- lm(GPP_NT_VUT_REF ~ SW_IN_F, data = data_stepwise_reg_)
+
+model_2_p <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F, data = data_stepwise_reg_)
+
+model_3_p <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F, data = data_stepwise_reg_)
+
+model_4_p <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F + TA_F, data = data_stepwise_reg_)
+
+model_5_p <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F + TA_F + P_F, data = data_stepwise_reg_)
+
+model_6_p <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F + TA_F + P_F + WS_F, data = data_stepwise_reg_)
+
+
+models <- list(model_1_p, model_2_p, model_3_p, model_4_p, model_5_p, model_6_p)
+
+model.names <- c("model_one", "model_two", "model_three", "model_four", "model_five", "model_six")
+
+aictab(cand.set = models, modnames = model.names)
+
+#the model still improved so I continue using variable WS_F
+
+model_1_p <- lm(GPP_NT_VUT_REF ~ SW_IN_F, data = data_stepwise_reg_)
+
+model_2_p <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F, data = data_stepwise_reg_)
+
+model_3_p <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F, data = data_stepwise_reg_)
+
+model_4_p <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F + TA_F, data = data_stepwise_reg_)
+
+model_5_p <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F + TA_F + P_F, data = data_stepwise_reg_)
+
+model_6_p <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F + TA_F + P_F + WS_F, data = data_stepwise_reg_)
+
+
+models <- list(model_1_p, model_2_p, model_3_p, model_4_p, model_5_p, model_6_p)
+
+model.names <- c("model_one", "model_two", "model_three", "model_four", "model_five", "model_six")
+
+aictab(cand.set = models, modnames = model.names)
+
+data_stepwise_reg_ <- data_stepwise_reg_ %>% relocate(WS_F, .before = PA_F)
+
+for(i in 8:ncol(data_stepwise_reg_)) {           
+  predictors_i <- colnames(data_stepwise_reg_)[i]   
+  mod_summaries[[i - 1]] <- summary(     
+    lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F + TA_F + P_F+ WS_F+., data_stepwise_reg_[ , c("GPP_NT_VUT_REF", "SW_IN_F", "LW_IN_F", "VPD_F","TA_F", "P_F","WS_F", predictors_i)]))
+ 
+}
+
+View(data_stepwise_reg_)
+
+#the model including C02_F_MDS had the highest R-Squared value of 0.5951. I will now calculate the AIC
+
+model_1_p <- lm(GPP_NT_VUT_REF ~ SW_IN_F, data = data_stepwise_reg_)
+
+model_2_p <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F, data = data_stepwise_reg_)
+
+model_3_p <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F, data = data_stepwise_reg_)
+
+model_4_p <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F + TA_F, data = data_stepwise_reg_)
+
+model_5_p <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F + TA_F + P_F, data = data_stepwise_reg_)
+
+model_6_p <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F + TA_F + P_F + WS_F, data = data_stepwise_reg_)
+
+model_7_p <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F + TA_F + P_F + WS_F + CO2_F_MDS, data = data_stepwise_reg_)
+
+
+models <- list(model_1_p, model_2_p, model_3_p, model_4_p, model_5_p, model_6_p, model_7_p)
+
+model.names <- c("model_one", "model_two", "model_three", "model_four", "model_five", "model_six", "model_seven")
+
+aictab(cand.set = models, modnames = model.names)
+
+# the model with C02_F_MDS was still better so I continue on.
+
+
+data_stepwise_reg_ <- data_stepwise_reg_ %>% relocate(CO2_F_MDS, .before = PA_F)
+
+for(i in 9:ncol(data_stepwise_reg_)) {           
+  predictors_i <- colnames(data_stepwise_reg_)[i]   
+  mod_summaries[[i - 1]] <- summary(     
+    lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F + TA_F + P_F+ WS_F+CO2_F_MDS+., data_stepwise_reg_[ , c("GPP_NT_VUT_REF", "SW_IN_F", "LW_IN_F", "VPD_F","TA_F", "P_F","WS_F","CO2_F_MDS", predictors_i)]))
+ 
+}
+
+# the model including USTAR had the highest R-Squared value of 0.5963. I will now calculate. the AIC:
+
+model_1_p <- lm(GPP_NT_VUT_REF ~ SW_IN_F, data = data_stepwise_reg_)
+
+model_2_p <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F, data = data_stepwise_reg_)
+
+model_3_p <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F, data = data_stepwise_reg_)
+
+model_4_p <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F + TA_F, data = data_stepwise_reg_)
+
+model_5_p <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F + TA_F + P_F, data = data_stepwise_reg_)
+
+model_6_p <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F + TA_F + P_F + WS_F, data = data_stepwise_reg_)
+
+model_7_p <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F + TA_F + P_F + WS_F + CO2_F_MDS, data = data_stepwise_reg_)
+
+model_8_p <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F + TA_F + P_F + WS_F + CO2_F_MDS + USTAR, data = data_stepwise_reg_)
+
+
+models <- list(model_1_p, model_2_p, model_3_p, model_4_p, model_5_p, model_6_p, model_7_p, model_8_p)
+
+model.names <- c("model_one", "model_two", "model_three", "model_four", "model_five", "model_six", "model_seven", "model_eight")
+
+aictab(cand.set = models, modnames = model.names)
+
+# the model was still better so i continue on
+
+data_stepwise_reg_ <- data_stepwise_reg_ %>% relocate(USTAR, .before = PA_F)
+
+for(i in 10:ncol(data_stepwise_reg_)) {           
+  predictors_i <- colnames(data_stepwise_reg_)[i]   
+  mod_summaries[[i - 1]] <- summary(     
+    lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F + TA_F + P_F+ WS_F+CO2_F_MDS+USTAR+., data_stepwise_reg_[ , c("GPP_NT_VUT_REF", "SW_IN_F", "LW_IN_F", "VPD_F","TA_F", "P_F","WS_F","CO2_F_MDS","USTAR", predictors_i)]))
+ 
+}
+
+View(data_stepwise_reg_)
+
+# no model had a higher R-Squared value so this is the final model. 
+
+model_final <- lm(GPP_NT_VUT_REF ~ SW_IN_F + LW_IN_F + VPD_F + TA_F + P_F + WS_F + CO2_F_MDS + USTAR, data = data_stepwise_reg_)
+
+#plotting the entire model:
+
+
+plot_1 <- ggplot(data_stepwise_reg_,aes(SW_IN_F, GPP_NT_VUT_REF)) +
+  geom_point(size = 0.5, color = "purple") +
+  geom_smooth(method='lm') +
+  theme_classic()
+
+plot_2 <- ggplot(data_stepwise_reg_,aes(LW_IN_F, GPP_NT_VUT_REF)) +
+  geom_point(size = 0.5, color = "purple") +
+  geom_smooth(method='lm') +
+  theme_classic()
+
+plot_3 <- ggplot(data_stepwise_reg_,aes(VPD_F, GPP_NT_VUT_REF)) +
+  geom_point(size = 0.5, color = "purple") +
+  geom_smooth(method='lm') +
+  theme_classic()
+
+plot_4 <- ggplot(data_stepwise_reg_,aes(TA_F, GPP_NT_VUT_REF)) +
+  geom_point(size = 0.5, color = "purple") +
+  geom_smooth(method='lm') +
+  theme_classic()
+
+plot_5 <- ggplot(data_stepwise_reg_,aes(P_F, GPP_NT_VUT_REF)) +
+  geom_point(size = 0.5, color = "purple") +
+  geom_smooth(method='lm') +
+  theme_classic()
+
+plot_6 <- ggplot(data_stepwise_reg_,aes(WS_F, GPP_NT_VUT_REF)) +
+  geom_point(size = 0.5, color = "purple") +
+  geom_smooth(method='lm') +
+  theme_classic()
+
+plot_7 <- ggplot(data_stepwise_reg_,aes(CO2_F_MDS, GPP_NT_VUT_REF)) +
+  geom_point(size = 0.5, color = "purple") +
+  geom_smooth(method='lm') +
+  theme_classic()
+
+plot_8 <- ggplot(data_stepwise_reg_,aes(USTAR, GPP_NT_VUT_REF)) +
+  geom_point(size = 0.5, color = "purple") +
+  geom_smooth(method='lm') +
+  theme_classic()
+
+library(ggplot2)
+  
+
+cowplot::plot_grid(plot_1, plot_2, plot_3, plot_4, plot_5, plot_6, plot_7,plot_8)
+
+
+
+
+
+```
+
+
+
+
+
+
